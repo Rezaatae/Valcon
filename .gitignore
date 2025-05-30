@@ -1,0 +1,15 @@
+# Ignore environment configuration
+.env
+
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+
+# VSCode settings
+.vscode/
+
+# Logs
+*.log
+
+# MacOS
+.DS_Store

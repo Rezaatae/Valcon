@@ -18,6 +18,6 @@ def generate_transaction():
 
 while True:
     transaction = generate_transaction()
-    producer.send('quickstart-events', transaction)
+    producer.send('reztest-topic', transaction)
     print(f"Sent: {transaction}")
     time.sleep(1)
