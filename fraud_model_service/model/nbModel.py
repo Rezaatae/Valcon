@@ -3,42 +3,49 @@ import pandas as pd
 import numpy as np
 import joblib
 
+#Visualization libraries
+import seaborn as sns
+import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.offline import plot, iplot, init_notebook_mode
+
 #preprocessing libraries
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 
 #ML libraries
 import tensorflow as tf
-# from sklearn.svm import SVC
-# from sklearn.preprocessing import LabelEncoder
+from sklearn.svm import SVC
+from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import StandardScaler
-# from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import GridSearchCV
-# from sklearn.linear_model import LogisticRegression
-# from sklearn.tree import DecisionTreeClassifier
-# from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
-# from sklearn.neighbors import KNeighborsClassifier
-# from sklearn.svm import SVC
-# from sklearn.svm import LinearSVC
-# from sklearn.pipeline import Pipeline
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.svm import LinearSVC
+from sklearn.pipeline import Pipeline
 
 #Metrics Libraries
-# from sklearn import metrics
+from sklearn import metrics
 from sklearn.metrics import classification_report
 from sklearn.model_selection import cross_val_score
-# from sklearn.metrics import accuracy_score
-# from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import confusion_matrix
 
 
 
 #Misc libraries
 import warnings
 warnings.filterwarnings("ignore")
-
 #Reading the data
-paysim=pd.read_csv("Fraud.csv")
+paysim=pd.read_csv('../raw_data/Fraud.csv')
+
 
 #Tallying the balance
 def balance_diff(data):
@@ -90,9 +97,24 @@ def merchant(data):
     values = ['M']
     conditions = list(map(data['nameDest'].str.contains, values))
     data['merchant'] = np.select(conditions, '1', '0')
+    
+#Applying balance_diff function
+balance_diff(paysim)
+
+paysim['orig_diff'].value_counts()
+paysim['dest_diff'].value_counts()
+
+#Applying frequency_receiver function
+frequency_receiver(paysim)
+paysim['freq_dest'].value_counts()
 
 #Creating a copy
 paysim_1=paysim.copy()
+
+#Checking for balance in target
+fig = go.Figure(data=[go.Pie(labels=['Not Fraud','Fraud'], values=paysim_1['isFraud'].value_counts())])
+fig.show()
+
 
 #Getting the max size
 max_size = paysim_1['isFraud'].value_counts().max()
@@ -103,9 +125,15 @@ for class_index, group in paysim_1.groupby('isFraud'):
     lst.append(group.sample(max_size-len(group), replace=True))
 paysim_1 = pd.concat(lst)
 
+#Checking the balanced target
+fig = go.Figure(data=[go.Pie(labels=['Not Fraud','Fraud'], values=paysim_1['isFraud'].value_counts())])
+fig.show()
+
 #One hot encoding
 paysim_1=pd.concat([paysim_1,pd.get_dummies(paysim_1['type'], prefix='type_')],axis=1)
 paysim_1.drop(['type'],axis=1,inplace = True)
+
+paysim_1.head()
 
 #Splitting dependent and independent variable
 paysim_2=paysim_1.copy()
@@ -147,7 +175,7 @@ X_test['customers_org'] = tf.keras.preprocessing.sequence.pad_sequences(customer
 X_train['customers_dest'] = tf.keras.preprocessing.sequence.pad_sequences(customers_train_dest, maxlen=1)
 X_test['customers_dest'] = tf.keras.preprocessing.sequence.pad_sequences(customers_test_dest, maxlen=1)
 
-
+#Dropping unnecessary columns
 X_train=X_train.drop(['nameOrig','nameDest','isFlaggedFraud'],axis=1)
 X_train = X_train.reset_index(drop=True)
 
@@ -155,22 +183,20 @@ X_test=X_test.drop(['nameOrig','nameDest','isFlaggedFraud'],axis=1)
 X_test = X_test.reset_index(drop=True)
 
 #creating the objects
-# logreg_cv = LogisticRegression(solver='liblinear',random_state=123)
-# dt_cv=DecisionTreeClassifier(random_state=123)
-# knn_cv=KNeighborsClassifier()
-# svc_cv=SVC(kernel='linear',random_state=123)
-# nb_cv=GaussianNB()
-# rf_cv=RandomForestClassifier(random_state=123)
-# cv_dict = {0: 'Logistic Regression', 1: 'Decision Tree',2:'KNN',3:'SVC',4:'Naive Bayes',5:'Random Forest'}
-# cv_models=[logreg_cv,dt_cv,knn_cv,svc_cv,nb_cv,rf_cv]
+logreg_cv = LogisticRegression(solver='liblinear',random_state=123)
+dt_cv=DecisionTreeClassifier(random_state=123)
+knn_cv=KNeighborsClassifier()
+svc_cv=SVC(kernel='linear',random_state=123)
 nb_cv=GaussianNB()
-cv_dict = {0 :'Naive Bayes'}
-cv_models=[nb_cv]
+rf_cv=RandomForestClassifier(random_state=123)
+cv_dict = {0: 'Logistic Regression', 1: 'Decision Tree',2:'KNN',3:'SVC',4:'Naive Bayes',5:'Random Forest'}
+cv_models=[logreg_cv,dt_cv,knn_cv,svc_cv,nb_cv,rf_cv]
+
 
 for i,model in enumerate(cv_models):
     print("{} Test Accuracy: {}".format(cv_dict[i],cross_val_score(model, X_train, y_train, cv=10, scoring ='accuracy').mean()))
-
-
+    
+    
 param_grid_nb = {
     'var_smoothing': np.logspace(0,-9, num=100)
 }
@@ -178,8 +204,36 @@ param_grid_nb = {
 nbModel_grid = GridSearchCV(estimator=GaussianNB(), param_grid=param_grid_nb, verbose=1, cv=10, n_jobs=-1)
 nbModel_grid.fit(X_train, y_train)
 print(nbModel_grid.best_estimator_)
+
+#Predict with the selected best parameter
 y_pred=nbModel_grid.predict(X_test)
 
+from sklearn.metrics import ConfusionMatrixDisplay
+
+#Plotting confusion matrix
+cm = metrics.confusion_matrix(y_test, y_pred)
+#disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['Not Fraud', 'Fraud']
+#disp.plot()
+#plt.show()
+
+#Predict with the selected best parameter
+y_pred=nbModel_grid.predict(X_test)
+
+
+def plot_confusion_matrix(cm, classes, title='Confusion Matrix', cmap=plt.cm.Blues):
+    plt.figure(figsize=(6,5))
+    sns.heatmap(cm, annot=True, fmt='d', cmap=cmap, xticklabels=classes, yticklabels=classes)
+    plt.xlabel('Predicted Label')
+    plt.ylabel('True Label')
+    plt.title(title)
+    plt.tight_layout()
+    plt.show()
+
+#Plotting confusion matrix
+cm = metrics.confusion_matrix(y_test, y_pred)
+plot_confusion_matrix(cm, classes=['Not Fraud','Fraud'])
+
+#Classification metrics
 print(classification_report(y_test, y_pred, target_names=['Not Fraud','Fraud']))
-print("reztest joblib dump")
-joblib.dump(nbModel_grid, 'nbModel.joblib')
+
+joblib.dump(nbModel_grid, "nbModel.joblib")
