@@ -3,8 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import transactions_collection
 from schemas import Transaction
 from typing import List
+from routes.transactions import router as transactions_router
 
 app = FastAPI()
+app.include_router(transactions_router)
 
 app.add_middleware(
     CORSMiddleware,
